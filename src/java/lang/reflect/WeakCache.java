@@ -23,7 +23,6 @@
  *
  */
 package java.lang.reflect;
-
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
@@ -33,107 +32,112 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 /**
- * Cache mapping pairs of {@code (key, sub-key) -> value}. Keys and values are
- * weakly but sub-keys are strongly referenced.  Keys are passed directly to
- * {@link #get} method which also takes a {@code parameter}. Sub-keys are
- * calculated from keys and parameters using the {@code subKeyFactory} function
- * passed to the constructor. Values are calculated from keys and parameters
- * using the {@code valueFactory} function passed to the constructor.
- * Keys can be {@code null} and are compared by identity while sub-keys returned by
- * {@code subKeyFactory} or values returned by {@code valueFactory}
- * can not be null. Sub-keys are compared using their {@link #equals} method.
- * Entries are expunged from cache lazily on each invocation to {@link #get},
- * {@link #containsValue} or {@link #size} methods when the WeakReferences to
- * keys are cleared. Cleared WeakReferences to individual values don't cause
- * expunging, but such entries are logically treated as non-existent and
- * trigger re-evaluation of {@code valueFactory} on request for their
- * key/subKey.
+ * 缓存映射对 {@code (key, sub-key) -> value}。键和值是弱引用，但子键是强引用。
+ * 键直接传递给 {@link #get} 方法，该方法还接受一个 {@code parameter} 参数。
+ * 子键通过构造函数传入的 {@code subKeyFactory} 函数从键和参数计算得出。
+ * 值通过构造函数传入的 {@code valueFactory} 函数从键和参数计算得出。
+ * 键可以为 {@code null}，并通过身份比较，而 {@code subKeyFactory} 返回的子键或
+ * {@code valueFactory} 返回的值不能为 null。子键通过其 {@link #equals} 方法进行比较。
+ * 每次调用 {@link #get}、{@link #containsValue} 或 {@link #size} 方法时，
+ * 当键的弱引用被清除时，缓存中的条目会被惰性地清除。单个值的弱引用被清除不会导致清除，
+ * 但此类条目在逻辑上被视为不存在，并在请求其键/子键时触发 {@code valueFactory} 的重新计算。
  *
  * @author Peter Levart
- * @param <K> type of keys
- * @param <P> type of parameters
- * @param <V> type of values
+ * @param <K> 键的类型
+ * @param <P> 参数的类型
+ * @param <V> 值的类型
  */
 final class WeakCache<K, P, V> {
 
+    // todo 一个引用队列，但不知道是谁的
     private final ReferenceQueue<K> refQueue
         = new ReferenceQueue<>();
-    // the key type is Object for supporting null key
+    // 键类型为 Object 以支持 null 键
     private final ConcurrentMap<Object, ConcurrentMap<Object, Supplier<V>>> map
         = new ConcurrentHashMap<>();
+    // todo 暂时不知道这个反转map是来干什么的
     private final ConcurrentMap<Supplier<V>, Boolean> reverseMap
         = new ConcurrentHashMap<>();
+    // BiFunction<A,B,C> 其中A、B为入参，C为返回值
+    // todo 子键工厂，目前感觉是提供子键用的
     private final BiFunction<K, P, ?> subKeyFactory;
+    // todo 值工厂，目前感觉是提供值用的
     private final BiFunction<K, P, V> valueFactory;
 
     /**
-     * Construct an instance of {@code WeakCache}
+     * 构造一个 {@code WeakCache} 实例
      *
-     * @param subKeyFactory a function mapping a pair of
-     *                      {@code (key, parameter) -> sub-key}
-     * @param valueFactory  a function mapping a pair of
-     *                      {@code (key, parameter) -> value}
-     * @throws NullPointerException if {@code subKeyFactory} or
-     *                              {@code valueFactory} is null.
+     * @param subKeyFactory 一个函数，将 {@code (key, parameter)} 映射为子键
+     * @param valueFactory  一个函数，将 {@code (key, parameter)} 映射为值
+     * @throws NullPointerException 如果 {@code subKeyFactory} 或
+     *                              {@code valueFactory} 为 null
      */
     public WeakCache(BiFunction<K, P, ?> subKeyFactory,
                      BiFunction<K, P, V> valueFactory) {
+        // 从使用层面来说，new WeakCache<>(new KeyFactory(), new ProxyClassFactory());
+        // subKeyFactory->KeyFactory
+        // valueFactory->ProxyClassFactory
         this.subKeyFactory = Objects.requireNonNull(subKeyFactory);
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
     /**
-     * Look-up the value through the cache. This always evaluates the
-     * {@code subKeyFactory} function and optionally evaluates
-     * {@code valueFactory} function if there is no entry in the cache for given
-     * pair of (key, subKey) or the entry has already been cleared.
+     * 通过缓存查找值。此方法始终会计算 {@code subKeyFactory} 函数，
+     * 如果缓存中没有给定 (key, subKey) 对的条目或条目已被清除，
+     * 则会可选地计算 {@code valueFactory} 函数。
      *
-     * @param key       possibly null key
-     * @param parameter parameter used together with key to create sub-key and
-     *                  value (should not be null)
-     * @return the cached value (never null)
-     * @throws NullPointerException if {@code parameter} passed in or
-     *                              {@code sub-key} calculated by
-     *                              {@code subKeyFactory} or {@code value}
-     *                              calculated by {@code valueFactory} is null.
+     * @param key       可能为 null 的键
+     * @param parameter 与键一起用于创建子键和值的参数（不应为 null）
+     * @return 缓存的值（永不为 null）
+     * @throws NullPointerException 如果传入的 {@code parameter} 或
+     *                              {@code subKeyFactory} 计算的 {@code sub-key} 或
+     *                              {@code valueFactory} 计算的 {@code value} 为 null
      */
     public V get(K key, P parameter) {
         Objects.requireNonNull(parameter);
-
+        //todo 暂时不懂
         expungeStaleEntries();
-
+        //如果key是空，则是一个代表NULL的强引用Object对象，否则是一个虚引用的子类对象
         Object cacheKey = CacheKey.valueOf(key, refQueue);
 
-        // lazily install the 2nd level valuesMap for the particular cacheKey
+        // 获取二级缓存
         ConcurrentMap<Object, Supplier<V>> valuesMap = map.get(cacheKey);
+        // 下面这个 if (valuesMap == null) {...}代码块是符合多线程的写法
         if (valuesMap == null) {
+            // map.putIfAbsent返回值是map中上一个value，所以这里用oldValuesMap
             ConcurrentMap<Object, Supplier<V>> oldValuesMap
                 = map.putIfAbsent(cacheKey,
                                   valuesMap = new ConcurrentHashMap<>());
+            //如果有旧值，说明其他线程在当前线程走到这里的时候已经创建了二级缓存，所以直接赋值给valuesMap
             if (oldValuesMap != null) {
                 valuesMap = oldValuesMap;
             }
         }
+        // 到这里为止，我们已经拿到了二级缓存，一级缓存的key是该方法的入参
+        // 那么二级缓存需要通过一级缓存和方法的另一个入参来计算
 
-        // create subKey and retrieve the possible Supplier<V> stored by that
-        // subKey from valuesMap
+        // 这个类的构造函数的入参其中之一就是subKeyFactory，提供了如何获取二级缓存key的方法
         Object subKey = Objects.requireNonNull(subKeyFactory.apply(key, parameter));
+        //这里获取了最终的value，是个Supplier
         Supplier<V> supplier = valuesMap.get(subKey);
+        // todo 暂时不知道这个fatory是干什么
         Factory factory = null;
 
+        // 直接while循环到todo 什么情况下break
         while (true) {
+            //如果最终获取的值不是空，直接调用他的get方法就可以返回了
             if (supplier != null) {
-                // supplier might be a Factory or a CacheValue<V> instance
+                // supplier 可能是 Factory 或 CacheValue<V> 实例
                 V value = supplier.get();
                 if (value != null) {
                     return value;
                 }
             }
-            // else no supplier in cache
-            // or a supplier that returned null (could be a cleared CacheValue
-            // or a Factory that wasn't successful in installing the CacheValue)
+            // 否则缓存中没有 supplier
+            // 或者 supplier 返回了 null（可能是清除的 CacheValue
+            // 或未成功安装 CacheValue 的 Factory）
 
-            // lazily construct a Factory
+            // 惰性地构造 Factory
             if (factory == null) {
                 factory = new Factory(key, parameter, subKey, valuesMap);
             }
@@ -141,18 +145,18 @@ final class WeakCache<K, P, V> {
             if (supplier == null) {
                 supplier = valuesMap.putIfAbsent(subKey, factory);
                 if (supplier == null) {
-                    // successfully installed Factory
+                    // 成功安装 Factory
                     supplier = factory;
                 }
-                // else retry with winning supplier
+                // 否则重试获胜的 supplier
             } else {
                 if (valuesMap.replace(subKey, supplier, factory)) {
-                    // successfully replaced
-                    // cleared CacheEntry / unsuccessful Factory
-                    // with our Factory
+                    // 成功替换
+                    // 清除的 CacheEntry / 不成功的 Factory
+                    // 替换为我们的 Factory
                     supplier = factory;
                 } else {
-                    // retry with current supplier
+                    // 重试当前的 supplier
                     supplier = valuesMap.get(subKey);
                 }
             }
@@ -160,13 +164,12 @@ final class WeakCache<K, P, V> {
     }
 
     /**
-     * Checks whether the specified non-null value is already present in this
-     * {@code WeakCache}. The check is made using identity comparison regardless
-     * of whether value's class overrides {@link Object#equals} or not.
+     * 检查指定的非空值是否已在此 {@code WeakCache} 中。检查使用身份比较，
+     * 无论值的类是否重写了 {@link Object#equals}。
      *
-     * @param value the non-null value to check
-     * @return true if given {@code value} is already cached
-     * @throws NullPointerException if value is null
+     * @param value 要检查的非空值
+     * @return 如果给定的 {@code value} 已缓存，则返回 true
+     * @throws NullPointerException 如果值为 null
      */
     public boolean containsValue(V value) {
         Objects.requireNonNull(value);
@@ -176,14 +179,16 @@ final class WeakCache<K, P, V> {
     }
 
     /**
-     * Returns the current number of cached entries that
-     * can decrease over time when keys/values are GC-ed.
+     * 返回当前缓存的条目数，当键/值被垃圾回收时，此数量会减少。
      */
     public int size() {
         expungeStaleEntries();
         return reverseMap.size();
     }
 
+    /**
+     * 通过轮询引用队列并移除与已清除键关联的条目来清除缓存中的陈旧条目。
+     */
     private void expungeStaleEntries() {
         CacheKey<K> cacheKey;
         while ((cacheKey = (CacheKey<K>)refQueue.poll()) != null) {
@@ -192,8 +197,7 @@ final class WeakCache<K, P, V> {
     }
 
     /**
-     * A factory {@link Supplier} that implements the lazy synchronized
-     * construction of the value and installment of it into the cache.
+     * 一个工厂类，继承自 {@link Supplier}，todo 讲解该类
      */
     private final class Factory implements Supplier<V> {
 
@@ -211,59 +215,55 @@ final class WeakCache<K, P, V> {
         }
 
         @Override
-        public synchronized V get() { // serialize access
-            // re-check
+        public synchronized V get() { // 序列化访问
+            // 重新检查
             Supplier<V> supplier = valuesMap.get(subKey);
             if (supplier != this) {
-                // something changed while we were waiting:
-                // might be that we were replaced by a CacheValue
-                // or were removed because of failure ->
-                // return null to signal WeakCache.get() to retry
-                // the loop
+                // 在我们等待时发生了变化：
+                // 可能是我们被 CacheValue 替换
+                // 或者由于失败而被移除 ->
+                // 返回 null 以通知 WeakCache.get() 重试循环
                 return null;
             }
-            // else still us (supplier == this)
+            // 否则仍然是我们（supplier == this）
 
-            // create new value
+            // 创建新值
             V value = null;
             try {
                 value = Objects.requireNonNull(valueFactory.apply(key, parameter));
             } finally {
-                if (value == null) { // remove us on failure
+                if (value == null) { // 失败时移除我们
                     valuesMap.remove(subKey, this);
                 }
             }
-            // the only path to reach here is with non-null value
+            // 到达此处的唯一路径是 value 不为 null
             assert value != null;
 
-            // wrap value with CacheValue (WeakReference)
+            // 用 CacheValue（弱引用）包装值
             CacheValue<V> cacheValue = new CacheValue<>(value);
 
-            // put into reverseMap
+            // 放入 reverseMap
             reverseMap.put(cacheValue, Boolean.TRUE);
 
-            // try replacing us with CacheValue (this should always succeed)
+            // 尝试用 CacheValue 替换我们（这应该总是成功）
             if (!valuesMap.replace(subKey, this, cacheValue)) {
-                throw new AssertionError("Should not reach here");
+                throw new AssertionError("不应到达此处");
             }
 
-            // successfully replaced us with new CacheValue -> return the value
-            // wrapped by it
+            // 成功用新的 CacheValue 替换我们 -> 返回其包装的值
             return value;
         }
     }
 
     /**
-     * Common type of value suppliers that are holding a referent.
-     * The {@link #equals} and {@link #hashCode} of implementations is defined
-     * to compare the referent by identity.
+     * 持有引用的值供应商的通用类型。
+     * 实现的 {@link #equals} 和 {@link #hashCode} 通过身份比较引用。
      */
     private interface Value<V> extends Supplier<V> {}
 
     /**
-     * An optimized {@link Value} used to look-up the value in
-     * {@link WeakCache#containsValue} method so that we are not
-     * constructing the whole {@link CacheValue} just to look-up the referent.
+     * 一个优化的 {@link Value}，用于在 {@link WeakCache#containsValue} 方法中查找值，
+     * 以便我们不必构造整个 {@link CacheValue} 来查找引用。
      */
     private static final class LookupValue<V> implements Value<V> {
         private final V value;
@@ -279,19 +279,19 @@ final class WeakCache<K, P, V> {
 
         @Override
         public int hashCode() {
-            return System.identityHashCode(value); // compare by identity
+            return System.identityHashCode(value); // 通过身份比较
         }
 
         @Override
         public boolean equals(Object obj) {
             return obj == this ||
                    obj instanceof Value &&
-                   this.value == ((Value<?>) obj).get();  // compare by identity
+                   this.value == ((Value<?>) obj).get();  // 通过身份比较
         }
     }
 
     /**
-     * A {@link Value} that weakly references the referent.
+     * 一个 {@link Value}，弱引用其引用。
      */
     private static final class CacheValue<V>
         extends WeakReference<V> implements Value<V>
@@ -300,7 +300,7 @@ final class WeakCache<K, P, V> {
 
         CacheValue(V value) {
             super(value);
-            this.hash = System.identityHashCode(value); // compare by identity
+            this.hash = System.identityHashCode(value); // 通过身份比较
         }
 
         @Override
@@ -313,28 +313,27 @@ final class WeakCache<K, P, V> {
             V value;
             return obj == this ||
                    obj instanceof Value &&
-                   // cleared CacheValue is only equal to itself
+                   // 清除的 CacheValue 仅等于自身
                    (value = get()) != null &&
-                   value == ((Value<?>) obj).get(); // compare by identity
+                   value == ((Value<?>) obj).get(); // 通过身份比较
         }
     }
 
     /**
-     * CacheKey containing a weakly referenced {@code key}. It registers
-     * itself with the {@code refQueue} so that it can be used to expunge
-     * the entry when the {@link WeakReference} is cleared.
+     * 包含弱引用 {@code key} 的 CacheKey。它将自己注册到 {@code refQueue}，
+     * 以便在 {@link WeakReference} 被清除时用于清除条目。
      */
     private static final class CacheKey<K> extends WeakReference<K> {
 
-        // a replacement for null keys
+        // 用于 null 键的替代品
         private static final Object NULL_KEY = new Object();
 
         static <K> Object valueOf(K key, ReferenceQueue<K> refQueue) {
             return key == null
-                   // null key means we can't weakly reference it,
-                   // so we use a NULL_KEY singleton as cache key
+                   // null 键意味着我们无法弱引用它，
+                   // 因此我们使用 NULL_KEY 单例作为缓存键
                    ? NULL_KEY
-                   // non-null key requires wrapping with a WeakReference
+                   // 非 null 键需要用 WeakReference 包装
                    : new CacheKey<>(key, refQueue);
         }
 
@@ -342,7 +341,7 @@ final class WeakCache<K, P, V> {
 
         private CacheKey(K key, ReferenceQueue<K> refQueue) {
             super(key, refQueue);
-            this.hash = System.identityHashCode(key);  // compare by identity
+            this.hash = System.identityHashCode(key);  // 通过身份比较
         }
 
         @Override
@@ -356,19 +355,24 @@ final class WeakCache<K, P, V> {
             return obj == this ||
                    obj != null &&
                    obj.getClass() == this.getClass() &&
-                   // cleared CacheKey is only equal to itself
+                   // 清除的 CacheKey 仅等于自身
                    (key = this.get()) != null &&
-                   // compare key by identity
+                   // 通过身份比较键
                    key == ((CacheKey<K>) obj).get();
         }
 
+        /**
+         * 从 map 和 reverseMap 中清除与此 CacheKey 关联的缓存条目。
+         *
+         * @param map 主缓存 map
+         * @param reverseMap 用于跟踪值的反向 map
+         */
         void expungeFrom(ConcurrentMap<?, ? extends ConcurrentMap<?, ?>> map,
                          ConcurrentMap<?, Boolean> reverseMap) {
-            // removing just by key is always safe here because after a CacheKey
-            // is cleared and enqueue-ed it is only equal to itself
-            // (see equals method)...
+            // 仅通过键移除总是安全的，因为在 CacheKey 被清除并入队后，
+            // 它仅等于自身（参见 equals 方法）...
             ConcurrentMap<?, ?> valuesMap = map.remove(this);
-            // remove also from reverseMap if needed
+            // 如果需要，也从 reverseMap 中移除
             if (valuesMap != null) {
                 for (Object cacheValue : valuesMap.values()) {
                     reverseMap.remove(cacheValue);

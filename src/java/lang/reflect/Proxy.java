@@ -532,17 +532,32 @@ public class Proxy implements java.io.Serializable {
         }
     }
 
-    /**
-     * A function that maps an array of interfaces to an optimal key where
-     * Class objects representing interfaces are weakly referenced.
-     */
+        /**
+     * 该类用于将接口数组映射为一个最优键，其中表示接口的 Class 对象是弱引用的。
+     *
+     * 该类实现了 BiFunction 接口，接收一个 ClassLoader 和一个表示接口的 Class 对象数组，
+     * 并根据提供的接口数量返回一个最优键。
+     **/
     private static final class KeyFactory
         implements BiFunction<ClassLoader, Class<?>[], Object>
     {
+        /**
+         * 根据提供的接口数量生成一个最优键。
+         *
+         * @param classLoader 用于加载接口的 ClassLoader。
+         * @param interfaces 表示接口的 Class 对象数组。
+         * @return Object 根据接口数量生成的最优键对象。
+         *
+         * 该方法使用 switch 语句根据接口数量返回以下对象：
+         * - 对于单个接口（最常见的情况），返回 Key1 对象。
+         * - 对于两个接口，返回 Key2 对象。
+         * - 对于零个接口，返回预定义的 key0 对象。
+         * - 对于超过两个接口，返回 KeyX 对象。
+         */
         @Override
         public Object apply(ClassLoader classLoader, Class<?>[] interfaces) {
             switch (interfaces.length) {
-                case 1: return new Key1(interfaces[0]); // the most frequent
+                case 1: return new Key1(interfaces[0]); // 最常见的情况
                 case 2: return new Key2(interfaces[0], interfaces[1]);
                 case 0: return key0;
                 default: return new KeyX(interfaces);
@@ -550,17 +565,21 @@ public class Proxy implements java.io.Serializable {
         }
     }
 
+
     /**
      * A factory function that generates, defines and returns the proxy class given
      * the ClassLoader and array of interfaces.
+     * 一个工厂函数，用于生产、定义和返回由类加载器和接口数组指定的代理类。
      */
     private static final class ProxyClassFactory
         implements BiFunction<ClassLoader, Class<?>[], Class<?>>
     {
         // prefix for all proxy class names
+        // 所有代理类的统一命名前缀
         private static final String proxyClassNamePrefix = "$Proxy";
 
         // next number to use for generation of unique proxy class names
+        // 用于生产代理类名称的下一个数字
         private static final AtomicLong nextUniqueNumber = new AtomicLong();
 
         @Override

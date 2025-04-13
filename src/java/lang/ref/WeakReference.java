@@ -25,45 +25,32 @@
 
 package java.lang.ref;
 
-
 /**
- * Weak reference objects, which do not prevent their referents from being
- * made finalizable, finalized, and then reclaimed.  Weak references are most
- * often used to implement canonicalizing mappings.
+ * 弱引用对象，它不会阻止其引用的对象被垃圾回收器标记为可终结、终结并最终回收。弱引用通常用于实现规范化映射。
  *
- * <p> Suppose that the garbage collector determines at a certain point in time
- * that an object is <a href="package-summary.html#reachability">weakly
- * reachable</a>.  At that time it will atomically clear all weak references to
- * that object and all weak references to any other weakly-reachable objects
- * from which that object is reachable through a chain of strong and soft
- * references.  At the same time it will declare all of the formerly
- * weakly-reachable objects to be finalizable.  At the same time or at some
- * later time it will enqueue those newly-cleared weak references that are
- * registered with reference queues.
+ * <p> 假设垃圾回收器在某个时间点确定一个对象是<a href="package-summary.html#reachability">弱可达的</a>。
+ * 此时，它会自动清除所有对该对象的弱引用，以及通过强引用和软引用链可达的其他弱可达对象的所有弱引用。
+ * 同时，它会将所有之前弱可达的对象标记为可终结的。在同一时间或稍后，它会将那些新清除的弱引用（如果已注册到引用队列）加入队列。
  *
  * @author   Mark Reinhold
  * @since    1.2
  */
-
 public class WeakReference<T> extends Reference<T> {
 
     /**
-     * Creates a new weak reference that refers to the given object.  The new
-     * reference is not registered with any queue.
+     * 创建一个新的弱引用，该引用指向给定的对象。该引用没有注册到任何队列。
      *
-     * @param referent object the new weak reference will refer to
+     * @param referent 新弱引用将指向的对象
      */
     public WeakReference(T referent) {
         super(referent);
     }
 
     /**
-     * Creates a new weak reference that refers to the given object and is
-     * registered with the given queue.
+     * 创建一个新的弱引用，该引用指向给定的对象，并注册到给定的队列。
      *
-     * @param referent object the new weak reference will refer to
-     * @param q the queue with which the reference is to be registered,
-     *          or <tt>null</tt> if registration is not required
+     * @param referent 新弱引用将指向的对象
+     * @param q 引用要注册到的队列，如果不需要注册，则为 <tt>null</tt>
      */
     public WeakReference(T referent, ReferenceQueue<? super T> q) {
         super(referent, q);

@@ -25,61 +25,41 @@
 
 package java.lang.ref;
 
-
 /**
- * Soft reference objects, which are cleared at the discretion of the garbage
- * collector in response to memory demand.  Soft references are most often used
- * to implement memory-sensitive caches.
+ * 软引用对象，由垃圾收集器根据内存需求决定是否清除。软引用通常用于实现内存敏感的缓存。
  *
- * <p> Suppose that the garbage collector determines at a certain point in time
- * that an object is <a href="package-summary.html#reachability">softly
- * reachable</a>.  At that time it may choose to clear atomically all soft
- * references to that object and all soft references to any other
- * softly-reachable objects from which that object is reachable through a chain
- * of strong references.  At the same time or at some later time it will
- * enqueue those newly-cleared soft references that are registered with
- * reference queues.
+ * <p> 假设垃圾收集器在某个时间点确定一个对象是<a href="package-summary.html#reachability">软可达</a>的。
+ * 此时，它可以选择原子性地清除所有指向该对象的软引用，以及通过强引用链可达的其他软可达对象的软引用。
+ * 同时或在稍后的时间，它会将那些已注册到引用队列的新清除的软引用入队。
  *
- * <p> All soft references to softly-reachable objects are guaranteed to have
- * been cleared before the virtual machine throws an
- * <code>OutOfMemoryError</code>.  Otherwise no constraints are placed upon the
- * time at which a soft reference will be cleared or the order in which a set
- * of such references to different objects will be cleared.  Virtual machine
- * implementations are, however, encouraged to bias against clearing
- * recently-created or recently-used soft references.
+ * <p> 在虚拟机抛出<code>OutOfMemoryError</code>之前，所有指向软可达对象的软引用都保证会被清除。
+ * 除此之外，对于软引用何时被清除或不同对象的软引用清除顺序没有任何限制。
+ * 然而，鼓励虚拟机实现偏向不清除最近创建或最近使用的软引用。
  *
- * <p> Direct instances of this class may be used to implement simple caches;
- * this class or derived subclasses may also be used in larger data structures
- * to implement more sophisticated caches.  As long as the referent of a soft
- * reference is strongly reachable, that is, is actually in use, the soft
- * reference will not be cleared.  Thus a sophisticated cache can, for example,
- * prevent its most recently used entries from being discarded by keeping
- * strong referents to those entries, leaving the remaining entries to be
- * discarded at the discretion of the garbage collector.
+ * <p> 该类的直接实例可用于实现简单的缓存；该类或其派生子类也可用于更复杂的数据结构中，以实现更高级的缓存。
+ * 只要软引用的引用对象是强可达的（即实际在使用中），软引用就不会被清除。
+ * 因此，例如，一个高级缓存可以通过保持对最近使用条目的强引用来防止这些条目被丢弃，而将剩余条目交由垃圾收集器决定是否清除。
  *
  * @author   Mark Reinhold
  * @since    1.2
  */
-
 public class SoftReference<T> extends Reference<T> {
 
     /**
-     * Timestamp clock, updated by the garbage collector
+     * 时间戳时钟，由垃圾收集器更新。该时钟用于跟踪软引用的最后访问时间，可能影响垃圾收集器清除引用的决策。
      */
     static private long clock;
 
     /**
-     * Timestamp updated by each invocation of the get method.  The VM may use
-     * this field when selecting soft references to be cleared, but it is not
-     * required to do so.
+     * 每次调用get方法时更新的时间戳。虚拟机在选择要清除的软引用时可能会使用该字段，但并非必须。
+     * 该时间戳有助于判断引用的使用频率。
      */
     private long timestamp;
 
     /**
-     * Creates a new soft reference that refers to the given object.  The new
-     * reference is not registered with any queue.
+     * 创建一个新的软引用，引用给定对象。该引用未注册到任何队列。
      *
-     * @param referent object the new soft reference will refer to
+     * @param referent 新软引用将引用的对象
      */
     public SoftReference(T referent) {
         super(referent);
@@ -87,13 +67,10 @@ public class SoftReference<T> extends Reference<T> {
     }
 
     /**
-     * Creates a new soft reference that refers to the given object and is
-     * registered with the given queue.
+     * 创建一个新的软引用，引用给定对象，并注册到指定队列。
      *
-     * @param referent object the new soft reference will refer to
-     * @param q the queue with which the reference is to be registered,
-     *          or <tt>null</tt> if registration is not required
-     *
+     * @param referent 新软引用将引用的对象
+     * @param q 引用要注册到的队列，如果不需要注册，则为<tt>null</tt>
      */
     public SoftReference(T referent, ReferenceQueue<? super T> q) {
         super(referent, q);
@@ -101,12 +78,9 @@ public class SoftReference<T> extends Reference<T> {
     }
 
     /**
-     * Returns this reference object's referent.  If this reference object has
-     * been cleared, either by the program or by the garbage collector, then
-     * this method returns <code>null</code>.
+     * 返回该引用对象所引用的对象。如果该引用对象已被程序或垃圾收集器清除，则返回<code>null</code>。
      *
-     * @return   The object to which this reference refers, or
-     *           <code>null</code> if this reference object has been cleared
+     * @return 该引用所引用的对象，如果该引用对象已被清除，则返回<code>null</code>
      */
     public T get() {
         T o = super.get();

@@ -25,34 +25,26 @@
 
 package java.lang.ref;
 
-
 /**
- * Phantom reference objects, which are enqueued after the collector
- * determines that their referents may otherwise be reclaimed.  Phantom
- * references are most often used to schedule post-mortem cleanup actions.
+ * 虚引用对象，当垃圾收集器确定其引用对象可以被回收时，虚引用会被放入队列中。
+ * 虚引用通常用于安排对象回收后的清理操作。
  *
- * <p> Suppose the garbage collector determines at a certain point in time
- * that an object is <a href="package-summary.html#reachability">
- * phantom reachable</a>.  At that time it will atomically clear
- * all phantom references to that object and all phantom references to
- * any other phantom-reachable objects from which that object is reachable.
- * At the same time or at some later time it will enqueue those newly-cleared
- * phantom references that are registered with reference queues.
+ * <p> 假设垃圾收集器在某个时间点确定一个对象是
+ * <a href="package-summary.html#reachability">虚可达</a>的。此时，它会原子性地清除
+ * 所有指向该对象的虚引用，以及所有指向从该对象可达的其他虚可达对象的虚引用。
+ * 同时或在稍后的某个时间，它会将那些新清除的虚引用放入已注册的引用队列中。
  *
- * <p> In order to ensure that a reclaimable object remains so, the referent of
- * a phantom reference may not be retrieved: The <code>get</code> method of a
- * phantom reference always returns <code>null</code>.
+ * <p> 为了确保可回收对象保持可回收状态，虚引用的引用对象无法被获取：
+ * 虚引用的 <code>get</code> 方法始终返回 <code>null</code>。
  *
  * @author   Mark Reinhold
  * @since    1.2
  */
-
 public class PhantomReference<T> extends Reference<T> {
 
     /**
-     * Returns this reference object's referent.  Because the referent of a
-     * phantom reference is always inaccessible, this method always returns
-     * <code>null</code>.
+     * 返回此引用对象的引用目标。由于虚引用的引用目标始终不可访问，因此该方法始终返回
+     * <code>null</code>。
      *
      * @return  <code>null</code>
      */
@@ -61,17 +53,13 @@ public class PhantomReference<T> extends Reference<T> {
     }
 
     /**
-     * Creates a new phantom reference that refers to the given object and
-     * is registered with the given queue.
+     * 创建一个新的虚引用，引用给定的对象，并注册到给定的队列中。
      *
-     * <p> It is possible to create a phantom reference with a <tt>null</tt>
-     * queue, but such a reference is completely useless: Its <tt>get</tt>
-     * method will always return {@code null} and, since it does not have a queue,
-     * it will never be enqueued.
+     * <p> 可以创建一个带有 <tt>null</tt> 队列的虚引用，但这样的引用完全无用：
+     * 它的 <tt>get</tt> 方法始终返回 {@code null}，并且由于没有队列，它永远不会被放入队列中。
      *
-     * @param referent the object the new phantom reference will refer to
-     * @param q the queue with which the reference is to be registered,
-     *          or <tt>null</tt> if registration is not required
+     * @param referent 新虚引用将引用的对象
+     * @param q 引用要注册到的队列，如果不需要注册，则为 <tt>null</tt>
      */
     public PhantomReference(T referent, ReferenceQueue<? super T> q) {
         super(referent, q);
