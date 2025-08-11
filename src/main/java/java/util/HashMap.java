@@ -337,6 +337,10 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      */
     static final int hash(Object key) {
         int h;
+        // 这里是HashMap的允许是null的原因，因为判断是空直接给hash值赋值0了
+        // 如果不是空，则取出key的hashCode，然后高16位无符号>>>右移16位，目的是高低16位异或
+        // 为啥用无符号>>>，因为hashCode是有符号整型
+        // 为啥用异或不用或或者与，因为哈希扰动效果更好
         return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
 
@@ -626,36 +630,64 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
         Node<K,V>[] tab; Node<K,V> p; int n, i;
+        // 先判断table是不是空的，或者是不是0大小，如果是空的或者0大小，则进行resize
         if ((tab = table) == null || (n = tab.length) == 0)
+            // 这里resize，返回值就是table resize后的大小
             n = (tab = resize()).length;
+        // 取索引，就是hash和table大小的取模
+        // 二进制取模就是与，(n - 1) & hash等于十进制的hash对n取模
+        // 下面的判断是如果p是null，说明没有hash冲突，则直接创建一个新的node放进这个位置就可以了
         if ((p = tab[i = (n - 1) & hash]) == null)
+            // 创建node并放入
             tab[i] = newNode(hash, key, value, null);
+        // 如果走到这个判断，则说明hash冲突了，那么hash冲突会有两种情况：
+        // 1、key不同：放入，这里又得有两种情况，这个桶可能是二叉树还可能是链表
+        // 2、key相同：替代原value
         else {
             Node<K,V> e; K k;
+            // 和桶头key相同情况，注意是桶头
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
+                // 先把旧节点保存起来，新的节点和旧的节点都是这个e，当然也是这个p
+                // 从这可以看出来，其实这个Node<K,V> e就是新的节点
                 e = p;
+            // key不同，已经是二叉树形态的情况
             else if (p instanceof TreeNode)
+                // 这里putTreeVal方法内部肯定也做了遍历判断是否有这个key
+                // 如果有则返回这个节点，否则就新增节点，返回新增节点
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+            // key不同，是链表形态的情况
             else {
+                // 这里的目的其实是在做遍历，遍历到最后一个链表
                 for (int binCount = 0; ; ++binCount) {
+                    // 真正走到这个if，说明p已经是这个桶位置的最后一个节点了
                     if ((e = p.next) == null) {
+                        // 新增这个节点
                         p.next = newNode(hash, key, value, null);
+                        // 增完要判断是不是要从链表变为二叉树形态了
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
                             treeifyBin(tab, hash);
                         break;
                     }
+                    // 这里是在链表中寻找相同key的节点，其实和外层的第一个if是一样的
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         break;
                     p = e;
                 }
             }
+            // 这里的e是新增或者修改的节点
             if (e != null) { // existing mapping for key
+                // 这里统一叫oldValue了，但实际上也有可能是新增的值
                 V oldValue = e.value;
+                // onlyIfAbsent是为了无则赋值
                 if (!onlyIfAbsent || oldValue == null)
                     e.value = value;
+                // 这个afterNodeAccess在HashMap是个空方法，
+                // LinkedListHashMap对这个方法进行了实现，
+                // 实际上就是一些钩子函数
                 afterNodeAccess(e);
+                // 返回值
                 return oldValue;
             }
         }
