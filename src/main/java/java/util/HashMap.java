@@ -381,6 +381,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Returns a power of two size for the given target capacity.
      */
     static final int tableSizeFor(int cap) {
+        // 下面的意思是，找到最接近的2的幂次结果
+        // 例如 3->4 5->8 10->16
         int n = cap - 1;
         n |= n >>> 1;
         n |= n >>> 2;
@@ -665,6 +667,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                         // 新增这个节点
                         p.next = newNode(hash, key, value, null);
                         // 增完要判断是不是要从链表变为二叉树形态了
+                        // 这里-1很细节，因为新增了一个节点，而binCount又没加上
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
                             treeifyBin(tab, hash);
                         break;
@@ -708,56 +711,103 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * @return the table
      */
     final Node<K,V>[] resize() {
+        // 开局先取原来的哈希桶数组 oldTab
         Node<K,V>[] oldTab = table;
+        // 取原始长度，如果是null则长度为0
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
+        // 旧的阈值：计算规则就是大小*负载因子
         int oldThr = threshold;
+        // 先预定下新的大小和阈值
         int newCap, newThr = 0;
+        // 如果旧的容量不是0，属于扩容
         if (oldCap > 0) {
+            // 进一步判断旧的容量是否已经达到了最大的容量限制，2^30次方
             if (oldCap >= MAXIMUM_CAPACITY) {
+                // 如果是，就把阈值赋值到整形的最大值
                 threshold = Integer.MAX_VALUE;
+                // 原封不动返回旧的容量就行了，已经无动于衷了，燃尽了
                 return oldTab;
             }
+            // 新的容量等于旧的容量x2，对于二进制就是有符号左移
+            // 这里的判断其实是为了计算新的阈值，实际上新的容量已经在这计算了
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
+                    // 如果旧的容量比默认容量16大，
+                    // 为啥旧的容量比默认容量16大才会将阈值变为原来的2倍啊？
+                    // todo 为了性能吗？
                      oldCap >= DEFAULT_INITIAL_CAPACITY)
                 newThr = oldThr << 1; // double threshold
         }
+        // 这里是旧的容量是0，且旧的阈值不是0，
+        // 因为如果出现这种情况，说明是第一次使用
+        // oldThr就是计算出来的构造函数传入的cap，向上最近的2的幂次
+        // 就直接用旧的阈值作为新的容量
         else if (oldThr > 0) // initial capacity was placed in threshold
             newCap = oldThr;
+        // 这里是旧的容量是0，且旧的阈值也是0
         else {               // zero initial threshold signifies using defaults
+            // 用默认的16作为容量
             newCap = DEFAULT_INITIAL_CAPACITY;
+            // 用默认的16容量x默认的负载因子计算阈值
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
+        // 如果新的阈值是0，接下来就是计算阈值
         if (newThr == 0) {
             float ft = (float)newCap * loadFactor;
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
                       (int)ft : Integer.MAX_VALUE);
         }
+        // 这里将新的阈值赋值给阈值的成员属性了
         threshold = newThr;
+        // 下面开始重新搞一个Node<K,V>[]来做为哈希桶数组了
         @SuppressWarnings({"rawtypes","unchecked"})
         Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
+        // 直接把哈希桶数组的成员变量给赋值上了
         table = newTab;
+        // 如果老的哈希桶数组不是空，就得做迁移工作
         if (oldTab != null) {
+            // 遍历老的
             for (int j = 0; j < oldCap; ++j) {
                 Node<K,V> e;
+                // 从老的中取哈希桶头，下面开始迁移
                 if ((e = oldTab[j]) != null) {
+                    // 先给老的赋null，随着这种遍历做老的清空
                     oldTab[j] = null;
+                    // 下面有三个条件分支
+                    // 第一个就是说当前遍历的哈希桶只有这一个节点，
+                    // 那么直接重新计算该节点在新的哈希桶数组的位置，
+                    // 然后放入就可以了，这对该节点是树形态还是链表形态其实都一样的，
+                    // 为什么要单独拿出这个条件，是因为如果涉及桶里有多个链表，那么就得挨个遍历计算新位置了
                     if (e.next == null)
                         newTab[e.hash & (newCap - 1)] = e;
+                    // 如果是树形态
                     else if (e instanceof TreeNode)
                         ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
+                    // 如果是链表形态
                     else { // preserve order
                         Node<K,V> loHead = null, loTail = null;
                         Node<K,V> hiHead = null, hiTail = null;
                         Node<K,V> next;
                         do {
                             next = e.next;
+                            // 注意这里是通过e.hash & oldCap的结果来判断当前节点在新的哈希桶数组中的索引
+                            // 因为原始的计算是e.hash & (oldCap-1)
+                            // 现在的计算是 e.hash & (oldCap << 1 -1)
+                            // 那么上述这俩计算差距其实就在于新的高位是0还是1，
+                            // 这个计算就是e.hash & oldCap
+                            // 如果是1，现位置就是原位置+老桶数组长
+                            // 如果是0，说明不动
+
+                            // 这里是不移动
                             if ((e.hash & oldCap) == 0) {
+                                // 看到这似乎懂了 lo代表计算是0，hi代表计算是1，
+                                // 回头算完两条链，放到对应位置就行了
                                 if (loTail == null)
                                     loHead = e;
                                 else
                                     loTail.next = e;
                                 loTail = e;
                             }
+                            // 这是移动
                             else {
                                 if (hiTail == null)
                                     hiHead = e;
@@ -768,10 +818,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                         } while ((e = next) != null);
                         if (loTail != null) {
                             loTail.next = null;
+                            // 放新哈希桶数组位置
                             newTab[j] = loHead;
                         }
                         if (hiTail != null) {
                             hiTail.next = null;
+                            // 放新哈希桶数组位置
                             newTab[j + oldCap] = hiHead;
                         }
                     }
