@@ -897,10 +897,17 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      */
     final Node<K,V> removeNode(int hash, Object key, Object value,
                                boolean matchValue, boolean movable) {
+
         Node<K,V>[] tab; Node<K,V> p; int n, index;
+        // 想要移除节点需要满足：
+        // 1、桶数组不为null
+        // 2、桶数组有容量
+        // 3、能在桶数组里找到这个key
         if ((tab = table) != null && (n = tab.length) > 0 &&
             (p = tab[index = (n - 1) & hash]) != null) {
             Node<K,V> node = null, e; K k; V v;
+            // 下面两个条件分支，无非就是遍历找节点的过程，
+            // 找到之后赋值给node
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
                 node = p;
@@ -919,16 +926,22 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     } while ((e = e.next) != null);
                 }
             }
+
+            // 这里的条件是符合移除
             if (node != null && (!matchValue || (v = node.value) == value ||
                                  (value != null && value.equals(v)))) {
+                // 树形态移除，这里面的方法肯定涉及回退链表的判断
                 if (node instanceof TreeNode)
                     ((TreeNode<K,V>)node).removeTreeNode(this, tab, movable);
                 else if (node == p)
                     tab[index] = node.next;
                 else
                     p.next = node.next;
+                // 增加修改次数
                 ++modCount;
+                // 容量减少
                 --size;
+                // 又是一个回调方法
                 afterNodeRemoval(node);
                 return node;
             }
