@@ -2,12 +2,22 @@ package my;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Main {
-    static ThreadLocal<String> threadLocal=new ThreadLocal<>();
-    static InheritableThreadLocal<String> inheritableThreadLocal = new InheritableThreadLocal<>();
-    private static String a="aaaaaaaaaaa";
     public static void main(String[] args) throws InterruptedException {
-        HashMap<String,String> map=new HashMap<>();
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
+                1,
+                1,
+                1L,
+                TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.AbortPolicy()
+        );
+        threadPoolExecutor.execute(()->{});
     }
 }

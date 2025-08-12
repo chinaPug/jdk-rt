@@ -905,6 +905,10 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             int rs = runStateOf(c);
 
             // Check if queue empty only if necessary.
+            // 前三项是正常的参数校验，
+            // 最后一个判断队列是否为空是因为如果不为空，
+            // 用这个方法是不合适的，这个方法的目的是启用一个线程，
+            // 并可以添加一个任务来给线程执行
             if (rs >= SHUTDOWN &&
                 ! (rs == SHUTDOWN &&
                    firstTask == null &&
@@ -1340,6 +1344,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * @throws NullPointerException if {@code command} is null
      */
     public void execute(Runnable command) {
+        // 检测空指针
         if (command == null)
             throw new NullPointerException();
         /*
@@ -1362,19 +1367,39 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * thread.  If it fails, we know we are shut down or saturated
          * and so reject the task.
          */
+        // 获取表示线程池状态和执行任务数的整形
         int c = ctl.get();
+        // 如果运行的线程数比
         if (workerCountOf(c) < corePoolSize) {
+            // 添加任务到核心线程执行，
+            // addWorker方法第二个参数用来标注是否使用核心线程运行
             if (addWorker(command, true))
                 return;
+            // 走到这里说名上述失败了，失败的原因是并发导致的之前的ctl.get()不准了
             c = ctl.get();
         }
+        // 判断线程池状态是不是还在运行
+        // 并且放入阻塞队列成功
         if (isRunning(c) && workQueue.offer(command)) {
+            // 再次查ctl.get()
             int recheck = ctl.get();
+            // 线程池状态不在运行并且
+            // 从阻塞队列中移除任务成功（从阻塞队列移除成功说明阻塞队列有这个值。。这不废话，因为上面的if刚把任务放进去，所以这里其实是利用短路与做的操作，顺便当作判断部分了）
             if (! isRunning(recheck) && remove(command))
+                // 拒绝策略，原因是线程池已经挂了
                 reject(command);
+            // 这里说的是如果没有可用线程的情况，但是任务入队了，
+            // 其实是在处理边界情况，即核心线程数为0
             else if (workerCountOf(recheck) == 0)
+                // 这里创建一个非核心线程，不指定任务，
+                // 创建好了自然会做阻塞队列的消费者
                 addWorker(null, false);
         }
+        // 这里虽然是else if
+        // 但其实已经概括了线程池不在运行态和入队失败的情况
+        // 具体区分在于添加一个非核心线程来处理这个任务
+        // 如果addWorker成功了则不管了，
+        // 如果addWorker失败了，说明线程池状态不对了，触发拒绝策略就可以了
         else if (!addWorker(command, false))
             reject(command);
     }
@@ -1763,6 +1788,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * @return {@code true} if the task was removed
      */
     public boolean remove(Runnable task) {
+        // 从阻塞队列里移除
         boolean removed = workQueue.remove(task);
         tryTerminate(); // In case SHUTDOWN and now empty
         return removed;
